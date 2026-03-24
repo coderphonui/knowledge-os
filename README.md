@@ -14,7 +14,7 @@ A structured knowledge base for technical work, research, brainstorming, and lea
 ### 1. Clone and run setup
 
 ```bash
-git clone <your-repo>
+git clone https://github.com/coderphonui/knowledge-os.git
 cd knowledge-os
 ./setup.sh
 ```
