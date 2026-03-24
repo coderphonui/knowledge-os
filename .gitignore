@@ -1,0 +1,72 @@
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Editors ───────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# ── Obsidian ──────────────────────────────────────────────────────────────────
+# Track plugin list and appearance, ignore per-machine workspace state
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+.obsidian/plugins/*/data.json
+
+# ── Symlinks created by setup.sh ─────────────────────────────────────────────
+# setup.sh symlinks agents/CLAUDE.md → CLAUDE.md and into .github/ and .claude/
+# Keep the originals in agents/ and skills/; ignore the generated symlink targets
+CLAUDE.md
+.claude/
+.github/copilot-instructions.md
+.github/skills/
+
+# ── Secrets & credentials ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+.envrc
+*.key
+*.pem
+*.p12
+*.pfx
+
+# ── Skill config.env files — each skill owns its own secrets ─────────────────
+brain/skills/*/config.env
+
+# ── MCP / AI tooling ──────────────────────────────────────────────────────────
+.mcp/secrets*
+.cache/
+
+# ── Calendar skill — OAuth tokens & downloaded credentials ────────────────────
+brain/skills/calendar/credentials*.json
+brain/skills/calendar/token*.json
+brain/skills/calendar/config.json
+
+# ── Semantic search vector store (ChromaDB embedded — local only) ─────────────
+brain/skills/query/vector_store/
+
+# ── Skill virtual environments (created by setup.sh for isolated deps) ─────────
+brain/skills/*/.venv/
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv
+
+# ── Node (if any tooling is added later) ──────────────────────────────────────
+node_modules/
+npm-debug.log*
+
+configuration
+workspace
+

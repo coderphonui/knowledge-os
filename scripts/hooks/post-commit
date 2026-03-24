@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# post-commit: re-index only knowledge base files touched in this commit
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+INDEX="$REPO_ROOT/brain/skills/query/.venv/bin/python $REPO_ROOT/brain/skills/query/scripts/index.py"
+
+# Get files changed in the last commit, relative to repo root
+changed=$(git diff-tree --no-commit-id -r --name-status HEAD)
+
+# Split into modified/added vs deleted, filter to data/ markdown only
+modified=$(echo "$changed" | awk '$1 ~ /^[AM]$/ && $2 ~ /^data\/.*\.md$/ { print $2 }')
+deleted=$(echo "$changed"  | awk '$1 == "D"          && $2 ~ /^data\/.*\.md$/ { print $2 }')
+
+if [ -z "$modified" ] && [ -z "$deleted" ]; then
+  exit 0
+fi
+
+cd "$REPO_ROOT"
+
+# Index each modified/added file individually
+if [ -n "$modified" ]; then
+  while IFS= read -r file; do
+    $INDEX file "$file" > /dev/null 2>&1 &
+  done <<< "$modified"
+fi
+
+# If files were deleted, run incremental to purge orphan chunks
+if [ -n "$deleted" ]; then
+  $INDEX incremental > /dev/null 2>&1 &
+fi
+
+exit 0

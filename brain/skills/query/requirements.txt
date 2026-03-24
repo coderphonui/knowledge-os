@@ -1,0 +1,14 @@
+# KB Semantic Search — Python dependencies
+# Installed automatically by setup.sh
+
+# Vector store (embedded mode — no server or Docker required)
+chromadb>=0.5.0
+
+# Ollama Python client — for local embedding via bge-m3 or nomic-embed-text
+ollama>=0.1.7
+
+# YAML frontmatter parsing
+pyyaml>=6.0
+
+# File system watcher (for watch.py auto-reindex)
+watchdog>=4.0.0

@@ -1,0 +1,32 @@
+{
+  "timezone": "Asia/Ho_Chi_Minh",
+  "default_account": "personal_google",
+  "accounts": {
+    "personal_google": {
+      "provider": "google",
+      "display_name": "Personal Google",
+      "credentials_path": "skills/calendar/credentials_google.json",
+      "token_path": "skills/calendar/token_google.json",
+      "default_calendar_id": "primary",
+      "scopes": ["https://www.googleapis.com/auth/calendar"]
+    },
+    "work_outlook": {
+      "provider": "microsoft",
+      "display_name": "Work Outlook",
+      "client_id": "YOUR_AZURE_APP_CLIENT_ID",
+      "token_path": "skills/calendar/token_outlook.json",
+      "default_calendar_id": "primary",
+      "scopes": ["Calendars.ReadWrite", "offline_access"]
+    },
+    "work_powerautomate": {
+      "provider": "powerautomate",
+      "display_name": "lịch công ty",
+      "endpoints": {
+        "get":    "https://prod-xx.logic.azure.com/...",
+        "create": "https://prod-xx.logic.azure.com/...",
+        "update": "https://prod-xx.logic.azure.com/...",
+        "delete": "https://prod-xx.logic.azure.com/..."
+      }
+    }
+  }
+}
