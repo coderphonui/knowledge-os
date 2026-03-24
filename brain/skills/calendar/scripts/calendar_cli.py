@@ -31,6 +31,32 @@ SKILL_DIR = Path(__file__).parent.parent
 CONFIG_PATH = SKILL_DIR / "config.json"
 
 
+def _find_project_root() -> Path:
+    """Find the project root (contains brain/ dir), with KB_ROOT env override."""
+    import os
+    env_root = os.environ.get("KB_ROOT")
+    if env_root:
+        return Path(env_root).resolve()
+    # Traverse up from SKILL_DIR until we find the repo root (has brain/)
+    candidate = SKILL_DIR
+    for _ in range(10):
+        if (candidate / "brain").is_dir():
+            return candidate
+        candidate = candidate.parent
+    return SKILL_DIR
+
+
+PROJECT_ROOT = _find_project_root()
+
+
+def resolve_path(p: str) -> Path:
+    """Resolve a path: absolute → as-is; relative → relative to PROJECT_ROOT."""
+    path = Path(p)
+    if path.is_absolute():
+        return path
+    return (PROJECT_ROOT / path).resolve()
+
+
 # ---------------------------------------------------------------------------
 # Output helpers
 # ---------------------------------------------------------------------------
@@ -202,7 +228,7 @@ class GoogleProvider:
         from google.auth.transport.requests import Request as GoogleRequest
         from googleapiclient.discovery import build as build_google_service
 
-        token_path = Path(self.config["token_path"])
+        token_path = resolve_path(self.config["token_path"])
         scopes: list[str] = self.config.get("scopes", ["https://www.googleapis.com/auth/calendar"])
 
         if not token_path.exists():
@@ -400,7 +426,7 @@ class MicrosoftProvider:
         if not client_id:
             out_err("Microsoft account config is missing 'client_id'. Check config.json.")
 
-        token_path = Path(self.config["token_path"])
+        token_path = resolve_path(self.config["token_path"])
         scopes: list[str] = self.config.get(
             "scopes", ["Calendars.ReadWrite", "offline_access"]
         )
