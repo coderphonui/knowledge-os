@@ -22,8 +22,7 @@ links:
   repo: ""
   docs: ""
   deploy: ""
-related:
-  - "[[]]"
+related: []
 ---
 
 # {title}
@@ -42,8 +41,8 @@ related:
 
 ## Sub-notes
 
-- [[{slug}/decisions|Decisions]] — technical and product decision log
-- [[{slug}/roadmap|Roadmap]] — milestones and sprint plans
+- [Decisions]({slug}/decisions.md) — technical and product decision log
+- [Roadmap]({slug}/roadmap.md) — milestones and sprint plans
 
 ## Quick links
 
@@ -164,5 +163,5 @@ status: active
 
 Add to the table:
 ```
-| [[{slug}/_index\|{title}]] | {short description} | {status} |
+| [{title}]({slug}/_index.md) | {short description} | {status} |
 ```

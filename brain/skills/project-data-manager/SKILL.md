@@ -18,7 +18,7 @@ Projects live in `data/projects/{slug}/`. Each project is a folder containing:
 - `roadmap.md` — milestones, sprint plans, next actions
 - additional notes as needed (e.g. `architecture.md`, `retrospective.md`)
 
-Wikilink to project main note: `[[{slug}/_index|{title}]]`
+Main note path: `data/projects/{slug}/_index.md`
 
 **Templates**: See [references/templates.md](references/templates.md) for full frontmatter and content templates for all project file types.
 
@@ -70,17 +70,25 @@ Use when the user wants to add a new sub-note to an existing project.
    - New sub-note (architecture, retro, spike, etc.) → create `data/projects/{slug}/{name}.md`
 2. For new sub-note files, use the generic sub-note template from references/templates.md.
 3. Update `date_modified` on `_index.md` to reflect project activity.
-4. Add a wikilink in `_index.md`'s Sub-notes section if not already there.
+4. Add a markdown link in `_index.md`'s Sub-notes section if not already there.
 
 ---
 
 ### SEARCH within a project
 
-When the user asks to find something inside one or all projects:
+When the user asks to find something inside one or all projects, use semantic search first, then manual grep as fallback.
 
+**Step 1 — Semantic search (preferred):**
+```bash
+brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/search.py "{user query}" --top-k 5 --json
+```
+Parse JSON results. If hits have `score >= 0.40`, return those.
+
+**Step 2 — Manual scan (fallback if no or low-score results):**
 1. **Single project**: List files in `data/projects/{slug}/`, read frontmatter + headings first, then grep for keyword across all files in the folder.
 2. **All projects**: Scan `data/projects/_index.md` for project list, then grep `data/projects/` recursively.
-3. Return: matched file + file path + relevant excerpt. Group by project if searching all.
+
+Return: matched file + file path + relevant excerpt. Group by project if searching all.
 
 ---
 
@@ -108,9 +116,9 @@ Output format:
 - {date}: [decision summary]
 
 **Files in this project**:
-- [[{slug}/_index|Overview]]
-- [[{slug}/decisions|Decisions]]
-- [[{slug}/roadmap|Roadmap]]
+- [_index.md]({slug}/_index.md) — Overview
+- [decisions.md]({slug}/decisions.md) — Decisions
+- [roadmap.md]({slug}/roadmap.md) — Roadmap
 - [other files if any]
 ```
 

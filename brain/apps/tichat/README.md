@@ -1,6 +1,6 @@
 # tichat (Tí Chat)
 
-A Slack bot that lets you query and interact with your Knowledge OS from any device. Send a message from your phone and get answers synthesized from your own notes, projects, journals, and ideas.
+A Slack bot powered by **Pi Agent SDK** — chat with your Knowledge OS from any device. Every message goes through the same Pi agent engine you use in the terminal, but delivered over Slack threads.
 
 ## How it works
 
@@ -9,17 +9,14 @@ You (Slack DM or @tichat mention)
         ↓
   Slack Bolt — Socket Mode (no public URL needed)
         ↓
-  LangGraph ReAct Agent — Gemini Flash 2.0
-  + System prompt built from all brain/skills/ SKILL.md files
+  Pi AgentSession (per-thread persistent session)
         ↓
-  Tools: execute · read_file · write_file · fetch_url · ls
+  Ollama Cloud — kimi-k2.6 (or any model you select)
         ↓
-  Runs your Python KB scripts (search.py, index.py, etc.)
+  Skills, tools, KB search, file I/O — identical to Pi terminal
         ↓
   Reply in Slack thread
 ```
-
-The agent loads every `SKILL.md` from `brain/skills/` at startup and injects them into its system prompt, so it knows how to search your KB, capture references, brainstorm, and run any other workflow your skills define — without you having to specify which skill to use.
 
 **Socket Mode** means the bot connects outbound to Slack's servers. No port forwarding or reverse proxy required.
 
@@ -28,9 +25,9 @@ The agent loads every `SKILL.md` from `brain/skills/` at startup and injects the
 ## Requirements
 
 - Node.js 20+
+- [Pi](https://github.com/mariozechner/pi-coding-agent) installed globally (`npm i -g @mariozechner/pi-coding-agent`)
 - The Knowledge OS repo checked out locally (`brain/skills/query/.venv` must exist — the query skill's Python environment)
 - A Slack workspace where you can create apps
-- A Google AI Studio API key
 
 ---
 
@@ -73,15 +70,60 @@ The agent loads every `SKILL.md` from `brain/skills/` at startup and injects the
 
 ---
 
-## 2. Get a Gemini API Key
+## 2. Configure Ollama Cloud (Pi)
 
-1. Go to [aistudio.google.com](https://aistudio.google.com).
-2. Click **Get API key → Create API key**.
-3. Copy the key.
+This bot reuses your existing Pi setup — no separate API key management.
+
+### Ensure Pi has Ollama Cloud configured
+
+Your global Pi config should already have this (check `~/.pi/agent/settings.json`):
+
+```json
+{
+  "packages": ["npm:pi-ollama-cloud"]
+}
+```
+
+If not, add it:
+
+```bash
+pi --package npm:pi-ollama-cloud
+```
+
+### Ensure your Ollama Cloud API key is stored
+
+```bash
+cat ~/.pi/agent/auth.json
+```
+
+Should contain:
+
+```json
+{
+  "ollama-cloud": {
+    "type": "api_key",
+    "key": "YOUR_OLLAMA_CLOUD_KEY"
+  }
+}
+```
+
+If missing, get your key from [ollama.com](https://ollama.com) and add it.
+
+### Choose your model in Pi
+
+The bot will auto-detect `kimi-k2.6` (or `kimi-k2.6:cloud`) from Ollama Cloud. To verify it's available:
+
+```bash
+pi --list-models | grep ollama-cloud
+```
+
+You should see `kimi-k2.6` in the list.
+
+> **To use a different model**, edit `src/agent/index.ts` and change the `resolveOllamaCloudModel()` function or swap the entire provider.
 
 ---
 
-## 3. Configure
+## 3. Configure tichat
 
 ```bash
 cd brain/apps/tichat
@@ -93,9 +135,7 @@ Edit `.env`:
 ```env
 SLACK_BOT_TOKEN=xoxb-...      # from step 1
 SLACK_APP_TOKEN=xapp-...      # from step 1
-GOOGLE_API_KEY=...             # from step 2
 KB_ROOT=/absolute/path/to/my-knowledge-os   # path to your KB repo root
-GEMINI_MODEL=gemini-2.0-flash  # optional, this is the default
 ```
 
 `KB_ROOT` must be the absolute path to the root of your knowledge-os repository — the directory that contains `brain/` and `data/`.
@@ -107,6 +147,8 @@ GEMINI_MODEL=gemini-2.0-flash  # optional, this is the default
 ```bash
 npm install
 ```
+
+This installs the Pi SDK (`@mariozechner/pi-coding-agent`) and `pi-ollama-cloud` extension.
 
 ---
 
@@ -128,9 +170,7 @@ npm start
 You should see:
 
 ```
-Starting tichat...
-Loaded 23 skills from .../brain/skills
-Agent ready — 23 skills loaded, model: gemini-2.0-flash
+Pi agent ready — KB_ROOT: /Users/.../my-knowledge-os
 tichat is live — listening for Slack messages
 ```
 
@@ -166,7 +206,7 @@ Replies always go into the thread of your message.
 
 ### Conversation context
 
-Within a thread, tichat remembers the last 20 messages, so you can ask follow-up questions naturally:
+Within a thread, tichat maintains a persistent Pi session, so you can ask follow-up questions naturally:
 
 ```
 you: @tichat what's my current project status?
@@ -178,34 +218,34 @@ you: which one has the highest priority?   ← follow-up, no need to repeat cont
 
 ## What the agent can do
 
-The agent has five tools available:
+The Pi agent comes with built-in tools (`read`, `bash`, `edit`, `write`, `ls`) and automatically loads:
 
-| Tool | What it does |
-| --- | --- |
-| `execute` | Runs shell commands — used to invoke `search.py`, `index.py`, and other KB scripts |
-| `read_file` | Reads any file by path (absolute or relative to `KB_ROOT`) |
-| `write_file` | Creates or overwrites a file, creating parent directories as needed |
-| `fetch_url` | Fetches the content of a URL (for capturing web references) |
-| `ls` | Lists a directory's contents |
+- All **skills** from `brain/skills/*/SKILL.md`
+- **Context files** (`AGENTS.md`, `data/profile.md`) walking up from `KB_ROOT`
+- **Global extensions** (including `pi-ollama-cloud` for model access)
 
-All skills defined in `brain/skills/` are loaded at startup. The agent picks the right workflow based on your message.
+It behaves exactly like running `pi` in your terminal inside the `KB_ROOT` directory.
 
 ---
 
-## How skills are loaded
+## Architecture
 
-At startup, `skill-loader.ts` reads every `SKILL.md` file under `brain/skills/` and applies a tool name translation pass before injecting them into the system prompt:
+```
+brain/apps/tichat/
+├── src/
+│   ├── index.ts              # Entry point: init Pi agent, start Slack app
+│   ├── agent/
+│   │   └── index.ts          # Pi SDK AgentSession wrapper (per-thread)
+│   └── slack/
+│       ├── app.ts            # Slack Bolt app (Socket Mode)
+│       └── handlers.ts       # DM + @mention handlers, thread routing
+├── .env
+├── .env.example
+├── package.json
+└── tsconfig.json
+```
 
-| Claude Code name | tichat name |
-| --- | --- |
-| `Bash tool` | `execute tool` |
-| `Read tool` | `read_file tool` |
-| `Write tool` | `write_file tool` |
-| `fetch MCP tool` | `fetch_url tool` |
-| `filesystem MCP tool` | `read_file tool` |
-| `AskUserQuestion` | ask the user a follow-up question in your next response |
-
-This lets the existing skills work without modification.
+**Key design:** each Slack thread gets its own `AgentSession` instance. Pi manages conversation history, model state, and tool access internally — no manual history map required.
 
 ---
 
@@ -215,44 +255,22 @@ This lets the existing skills work without modification.
 - Make sure `message.im` is in your Event Subscriptions.
 - Verify Socket Mode is enabled and `SLACK_APP_TOKEN` is correct.
 
-**Bot responds to @mention but not follow-up messages in the same thread**
+**Bot responds to @mention but not follow-up messages**
 - For **public channels**: add `message.channels` to Event Subscriptions and `channels:history` to Bot Token Scopes.
 - For **private channels**: add `message.groups` to Event Subscriptions and `groups:history` + `groups:read` to Bot Token Scopes.
-- After adding scopes, go to **OAuth & Permissions → Reinstall to Workspace** for the new scopes to take effect.
+- After adding scopes, go to **OAuth & Permissions → Reinstall to Workspace**.
 - Note: follow-up detection is in-memory. If the bot restarts after the initial @mention but before you reply, it will lose the thread context and stop responding until you @mention again.
+
+`Error: Model kimi-k2.6 not found in Ollama Cloud provider`
+- Ensure `npm:pi-ollama-cloud` is in your Pi `settings.json` packages list.
+- Run `pi --list-models` and verify an `ollama-cloud` model appears.
+- Try running `pi /ollama-cloud-refresh` in your terminal to update the model cache.
 
 `Error: SLACK_BOT_TOKEN is required`
 - Your `.env` file is missing or not in `brain/apps/tichat/`. Run from that directory.
 
-`Skills directory not found`
-- Check that `KB_ROOT` in `.env` points to the repo root (the folder containing `brain/`), not a subdirectory.
-
 **Search returns no results**
-- The KB index may not be built. The agent will run `index.py full` automatically, but you can also run it manually:
-```bash
-brain/skills/query/.venv/bin/python brain/skills/query/scripts/index.py full
-```
-
-`recursionLimit`** errors**
-- The agent hit 25 tool-call steps. The query may be too broad — try being more specific.
-
----
-
-## Project structure
-
-```
-brain/apps/tichat/
-├── src/
-│   ├── index.ts              # Entry point
-│   ├── agent/
-│   │   ├── index.ts          # createReactAgent() setup
-│   │   ├── skill-loader.ts   # Loads brain/skills/ + applies TOOL_MAP
-│   │   ├── base-prompt.ts    # Builds system prompt with profile + skills
-│   │   └── tools.ts          # execute, read_file, write_file, fetch_url, ls
-│   └── slack/
-│       ├── app.ts            # Slack Bolt app (Socket Mode)
-│       └── handlers.ts       # DM + @mention handlers, thread history
-├── .env.example
-├── package.json
-└── tsconfig.json
-```
+- The KB index may not be built. Run it manually:
+  ```bash
+  brain/skills/query/.venv/bin/python brain/skills/query/scripts/index.py full
+  ```

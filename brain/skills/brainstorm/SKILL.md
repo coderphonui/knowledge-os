@@ -1,6 +1,6 @@
 ---
 name: brainstorm
-description: Thinking partner and creativity facilitator for one-on-one brainstorming, idea generation, problem-solving, and decision-making. Uses Socratic questioning as default mode with a toolkit of proven creativity frameworks (SCAMPER, First Principles, Six Hats, HMW, Reverse Brainstorm, JTBD, Analogical Thinking, Pre-mortem, Five Whys, Second-order Thinking, Rapid Ideation, Regret Minimization). Use when the user says "brainstorm", "think through", "help me decide", "explore ideas for", "I'm stuck", "tôi đang suy nghĩ về", "giúp tôi suy nghĩ về", "brainstorm với tôi", "tôi cần ý tưởng", "tôi đang bí".
+description: Thinking partner and creativity facilitator for one-on-one brainstorming, idea generation, problem-solving, and decision-making. Uses Socratic questioning as default mode with a toolkit of proven creativity frameworks (SCAMPER, First Principles, Six Hats, HMW, Reverse Brainstorm, JTBD, Analogical Thinking, Pre-mortem, Five Whys, Second-order Thinking, Rapid Ideation, Regret Minimization). Use when the user says "brainstorm", "think through", "help me decide", "explore ideas for", "I'm stuck", "tôi cần ý tưởng", or any brainstorming or ideation request.
 ---
 
 # Brainstorm Skill
@@ -13,7 +13,7 @@ Thinking partner, not analyst. Default mode: Socratic — one question at a time
 
 ## Phase 0 — Context Check (silent, always first)
 
-1. Search KB: `skills/query/.venv/bin/python skills/query/scripts/search.py "[topic]" --top-k 3 --json`
+1. Search KB: `brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/search.py "[topic]" --top-k 3 --json`
 2. Note any open questions from existing notes
 3. Detect session type:
 
@@ -61,7 +61,7 @@ Socratic moves:
 - **Flip it**: "What if the opposite were true?"
 - **Expose gap**: "You've talked about [A] and [B] — what's the connection you're not sure about?"
 - **Surface constraint**: "What's stopping you from just doing [obvious thing]?"
-- **Connect to KB**: "You have a note on [[related-topic]] — does that change anything here?"
+- **Connect to KB**: "You have a note on related-topic — does that change anything here?"
 
 Check every 3–4 exchanges: "Are we going the right direction, or is there a different angle worth exploring?"
 

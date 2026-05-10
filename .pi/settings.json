@@ -1,0 +1,5 @@
+{
+  "skills": ["../brain/skills"],
+  "enableSkillCommands": true,
+  "sessionDir": ".pi/sessions"
+}

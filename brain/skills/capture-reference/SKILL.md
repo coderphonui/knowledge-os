@@ -18,7 +18,10 @@ The goal is to turn something external into something personal. A good reference
 
 **1. Retrieve the source.**
 
-- If a URL was given, use the `fetch` MCP tool to retrieve the full content.
+- If a URL was given, use `bash` with `curl` to retrieve the full content, or use `web_fetch` if available.
+  ```bash
+  curl -sL "<URL>"
+  ```
 - If text was pasted directly, use that as the source.
 - If only a partial excerpt was shared, note this in the frontmatter (`source_type: excerpt`) and ask if the user wants to fetch the full source.
 
@@ -38,7 +41,7 @@ If metadata is ambiguous (e.g., a GitHub README has no author), use best judgmen
 2–3 sentences. The summary should answer: "Why did I save this?" — not just "What is this about?"
 
 Bad: *"This article discusses the CAP theorem and its implications for distributed systems."*
-Good: *"A clear explanation of why you can't have consistency, availability, and partition tolerance simultaneously — useful reference for the trade-off decisions in [[project-database-design]]."*
+Good: *"A clear explanation of why you can't have consistency, availability, and partition tolerance simultaneously — useful reference for the trade-off decisions in project-database-design."*
 
 The difference is perspective. Write as if you're the user explaining to their future self.
 
@@ -54,7 +57,19 @@ Good: *"In a network partition, you must choose either consistency (refuse to an
 
 **5. Suggest connections to existing KB.**
 
-Scan the `data/` directory for notes that relate to this source. Suggest `[[wikilinks]]` to add to the `related` section and body of the note. Don't force connections — only suggest ones that genuinely add context.
+Search the KB using the note title, URL, and key concepts from the source:
+```bash
+brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/search.py "{note title or key concept}" --top-k 5 --json
+```
+
+Suggest related note paths to add to the `related` section and body of the note. Don't force connections — only suggest ones that genuinely add context.
+
+**Duplicate detection:** Before creating the file, check for existing notes with the same URL or title:
+```bash
+brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/search.py "{canonical URL or title}" --top-k 3 --json
+```
+
+If a potential duplicate exists (score ≥ 0.50 or same URL found), surface it and ask whether to update the existing note or create a new one.
 
 **6. Suggest tags.**
 
@@ -68,14 +83,18 @@ Propose tags from the established taxonomy:
 
 - Path: `data/references/[kebab-case-title].md`
 - Use the template at `data/_templates/reference.md`
-- Leave the "My thoughts" section blank — this is for the user to fill in later, not for you to invent
+- The output frontmatter must include:
+  - `status: captured` — signals this is raw Layer 0 data, not yet processed by the user
+  - `layer: 0` — explicitly marks this as raw data in the Three-Layer Pipeline
+  - `ai-assisted: true` — flags that the summary and takeaways were AI-generated, not user-distilled
+- Leave the "My thoughts" and "My reaction / disagreements" sections blank — this is for the user to fill in later. Only the user can move this note from Layer 0 → Layer 1 → Layer 2.
 
 **8. Confirm what was created.**
 
 Reply with:
 - The file path created
 - One-sentence description of what was saved
-- Any suggested `[[wikilinks]]` to add manually
+- Any suggested related notes to link manually
 
 ## Edge cases
 

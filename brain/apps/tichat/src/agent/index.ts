@@ -1,91 +1,139 @@
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import { createReactAgent } from '@langchain/langgraph/prebuilt';
-import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { buildSystemPrompt } from './base-prompt.js';
-import { loadSkills } from './skill-loader.js';
-import { allTools } from './tools.js';
-import * as path from 'path';
+import {
+  createAgentSession,
+  SessionManager,
+  AuthStorage,
+  ModelRegistry,
+  DefaultResourceLoader,
+  getAgentDir,
+  type AgentSession,
+} from '@mariozechner/pi-coding-agent';
 
 const KB_ROOT = process.env.KB_ROOT || process.cwd();
-const SKILLS_DIR = path.join(KB_ROOT, 'brain/skills');
+const AGENT_DIR = getAgentDir();
 
-let agent: ReturnType<typeof createReactAgent> | null = null;
-let systemPrompt: string | null = null;
+// Thread-scoped Pi sessions
+const sessions = new Map<string, AgentSession>();
+
+async function resolveOllamaCloudModel(modelRegistry: ModelRegistry) {
+  // 1. Check if pi-ollama-cloud extension already registered the model
+  let model = modelRegistry.find('ollama-cloud', 'kimi-k2.6');
+  if (!model) {
+    model = modelRegistry.find('ollama-cloud', 'kimi-k2.6:cloud');
+  }
+  if (model) return model;
+
+  // 2. Fallback: inline model definition (standalone, no extension needed)
+  //    This mirrors the config pi-ollama-cloud would register.
+  const authStorage = AuthStorage.create();
+  const key = (await authStorage.getApiKey('ollama-cloud')) || process.env.OLLAMA_API_KEY;
+  if (!key) {
+    console.warn('[agent] No ollama-cloud API key found. Inline model unavailable.');
+    return undefined;
+  }
+
+  return {
+    id: 'kimi-k2.6',
+    provider: 'ollama-cloud',
+    name: 'Kimi K2.6 (Ollama Cloud)',
+    api: 'openai-completions',
+    baseUrl: 'https://ollama.com/v1',
+    reasoning: true,
+    input: ['text', 'image'] as ('text' | 'image')[],
+    contextWindow: 262144,
+    maxTokens: 32768,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  };
+}
 
 export async function initAgent(): Promise<void> {
-  const model = new ChatGoogleGenerativeAI({
-    model: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash-lite',
-    apiKey: process.env.GOOGLE_API_KEY,
-    temperature: 0,
-  });
+  // Ensure OLLAMA_API_KEY env var is set from auth.json
+  const authStorage = AuthStorage.create();
+  const ollamaKey = await authStorage.getApiKey('ollama-cloud');
+  if (ollamaKey && !process.env.OLLAMA_API_KEY) {
+    process.env.OLLAMA_API_KEY = ollamaKey;
+  }
 
-  const skills = await loadSkills(SKILLS_DIR);
-  systemPrompt = await buildSystemPrompt(KB_ROOT, skills);
-
-  agent = createReactAgent({
-    llm: model,
-    tools: allTools,
-  });
-
-  console.log(`Agent ready — ${skills.length} skills loaded, model: ${process.env.GEMINI_MODEL ?? 'gemini-2.0-flash'}`);
+  console.log(`Pi agent ready — KB_ROOT: ${KB_ROOT}`);
 }
 
 export async function runAgent(
   userMessage: string,
-  history: BaseMessage[] = []
+  threadTs: string
 ): Promise<string> {
-  if (!agent || !systemPrompt) {
-    await initAgent();
+  let session = sessions.get(threadTs);
+
+  if (!session) {
+    const authStorage = AuthStorage.create();
+    const modelRegistry = ModelRegistry.create(authStorage);
+
+    const model = await resolveOllamaCloudModel(modelRegistry);
+    if (!model) {
+      const available = await modelRegistry.getAvailable();
+      const ollamaModels = available
+        .filter((m) => m.provider === 'ollama-cloud')
+        .map((m) => m.id);
+      throw new Error(
+        'Model kimi-k2.6 not available.\n' +
+        'Ensure your Ollama Cloud API key is configured in ~/.pi/agent/auth.json ' +
+        'under the "ollama-cloud" key, or set the OLLAMA_API_KEY env var.\n' +
+        'Available ollama-cloud models: ' +
+        (ollamaModels.length ? ollamaModels.join(', ') : 'none')
+      );
+    }
+
+    const loader = new DefaultResourceLoader({
+      cwd: KB_ROOT,
+      agentDir: AGENT_DIR,
+    });
+    await loader.reload();
+
+    const { session: newSession } = await createAgentSession({
+      cwd: KB_ROOT,
+      agentDir: AGENT_DIR,
+      model,
+      authStorage,
+      modelRegistry,
+      sessionManager: SessionManager.inMemory(),
+      resourceLoader: loader,
+    });
+
+    session = newSession;
+    sessions.set(threadTs, session);
   }
 
-  const messages: BaseMessage[] = [
-    new SystemMessage(systemPrompt!),
-    ...history,
-    new HumanMessage(userMessage),
-  ];
+  return new Promise((resolve, reject) => {
+    let output = '';
 
-  try {
-    const result = await agent!.invoke(
-      { messages },
-      { recursionLimit: 25 }
-    );
-
-    // Find last AI message with non-empty text content
-    const resultMessages = result.messages;
-
-    // Debug: log message types and content shapes
-    console.debug('[agent] message trace:');
-    for (const msg of resultMessages) {
-      const t = (msg as any)._getType?.() ?? msg.constructor?.name;
-      const c = msg.content;
-      const shape = Array.isArray(c)
-        ? `array[${c.length}] types=${(c as any[]).map((x: any) => x.type).join(',')}`
-        : typeof c === 'string'
-        ? `string(${c.length})`
-        : typeof c;
-      console.debug(`  [${t}] ${shape}`);
-    }
-
-    for (let i = resultMessages.length - 1; i >= 0; i--) {
-      const msg = resultMessages[i];
-      const msgType = (msg as any)._getType?.() ?? msg.constructor?.name;
-      // Only consider AI messages
-      if (msgType !== 'ai' && msgType !== 'AIMessage') continue;
-
-      const content = msg.content;
-      if (typeof content === 'string' && content.trim()) return content;
-      if (Array.isArray(content)) {
-        const text = content
-          .filter((c: any) => (c.type === 'text' || c.type === 'model') && (c.text || c.parts))
-          .map((c: any) => c.text ?? c.parts?.map((p: any) => p.text).join('') ?? '')
-          .join('');
-        if (text.trim()) return text;
+    const unsub = session!.subscribe((event) => {
+      if (
+        event.type === 'message_update' &&
+        event.assistantMessageEvent.type === 'text_delta'
+      ) {
+        output += event.assistantMessageEvent.delta;
       }
-    }
-    console.warn('[agent] no parseable AI message found in result');
-    return 'No data available.';
-  } catch (error: any) {
-    console.error('Agent error:', error);
-    throw error;
+    });
+
+    session!
+      .prompt(userMessage)
+      .then(() => {
+        unsub();
+        resolve(output.trim() || 'Done.');
+      })
+      .catch((err) => {
+        unsub();
+        reject(err);
+      });
+  });
+}
+
+export function isThreadActive(threadTs: string): boolean {
+  return sessions.has(threadTs);
+}
+
+export function disposeThread(threadTs: string): void {
+  const s = sessions.get(threadTs);
+  if (s) {
+    s.dispose();
+    sessions.delete(threadTs);
   }
 }

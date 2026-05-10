@@ -8,24 +8,22 @@ This document describes how the repository is organized at the tooling level —
 
 ```
 data/          ← user's knowledge base (notes, projects, journal, etc.)
-workspace/     ← intermediate working files, safe to clean up any time
-  interview-recording/  ← recording files for interview pipeline
 brain/         ← the brain of knowledge OS
   skills/      ← modular skill packages
   apps/        ← future apps (placeholder)
   instructions/
     BRAIN-INSTRUCTION.md  ← single source of truth for agent instructions
-    settings.json         ← Claude Code hooks & plugins
+
 ```
 
 ---
 
-## Single source of truth: `brain/instructions/BRAIN-INSTRUCTION.md`
+## Single source of truth: brain/instructions/BRAIN-INSTRUCTION.md
 
 The file `brain/instructions/BRAIN-INSTRUCTION.md` is the canonical agent instruction file. It is **not** edited in-place at the repo root or in `.github/`. Those copies are symlinks created by `setup.sh`.
 
 | Symlink target | Purpose |
-|---|---|
+| --- | --- |
 | `CLAUDE.md` | Claude Code auto-reads this from project root |
 | `.github/copilot-instructions.md` | GitHub Copilot reads this automatically |
 
@@ -38,7 +36,7 @@ The file `brain/instructions/BRAIN-INSTRUCTION.md` is the canonical agent instru
 Skills live in `brain/skills/<name>/` and are symlinked into tool-specific directories by `setup.sh`.
 
 | Source | Symlink target | Consumed by |
-|---|---|---|
+| --- | --- | --- |
 | `brain/skills/<name>/` | `.claude/skills/<name>/` | Claude Code |
 | `brain/skills/<name>/` | `.github/skills/<name>/` | GitHub Copilot |
 
@@ -116,7 +114,7 @@ MCP server configuration lives in `.mcp/`. This is separate from skills and is n
 ## What NOT to modify directly
 
 | File / directory | Why |
-|---|---|
+| --- | --- |
 | `CLAUDE.md` (root) | Symlink — edit `brain/instructions/BRAIN-INSTRUCTION.md` instead |
 | `.github/copilot-instructions.md` | Symlink — edit `brain/instructions/BRAIN-INSTRUCTION.md` instead |
 | `.claude/skills/<name>` | Symlink — edit `brain/skills/<name>` instead |

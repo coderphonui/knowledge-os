@@ -8,6 +8,16 @@ description: >
   (e.g. "what have I written about X", "do I have anything on Y", "pull up my notes on Z",
   "what do I know about W"). Also trigger when the user asks a technical question that
   could plausibly be answered from their own knowledge base before searching the web.
+  
+  **How to run search (shared script):**
+  ```bash
+  brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/search.py "QUERY" --top-k 5 --json
+  ```
+  
+  **How to rebuild index (shared script):**
+  ```bash
+  brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/index.py full
+  ```
 ---
 
 # Query skill
@@ -16,6 +26,14 @@ The goal of this skill is to feel like asking a smart research assistant who has
 everything you've ever written. The response should feel synthesized and personal — not
 a file listing, not quoted excerpts, but a genuine answer that draws on the user's own
 notes and reflects their perspective back at them.
+
+## When to trigger this skill vs. calling the script directly
+
+| Situation | Use what? | Why |
+|---|---|---|
+| User asks "what do I know about X?" / "do I have notes on Y?" | **Trigger this skill** | We need the full synthesis pipeline: semantic search → read → synthesize → orient |
+| Another skill needs quick context lookup (e.g., PM load project context) | **Call script directly** | A skill's internal workflow should stay self-contained; use `--json` for programmatic parsing |
+| AGENTS.md Feedback Loops (before answering/creating) | **Call script directly** | Fast lookup; agent decides whether to synthesize or surface |
 
 ## How to approach a query
 
@@ -32,11 +50,11 @@ synthesis for a simple lookup.
 
 **0. Semantic search (preferred — fast, meaning-aware)**
 
-Run the vector search script first. This is far faster than scanning directories
+Run the shared vector search script first. This is far faster than scanning directories
 and understands intent, not just keywords.
 
 ```bash
-skills/query/.venv/bin/python skills/query/scripts/search.py "YOUR QUERY HERE" --top-k 5 --json
+brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/search.py "YOUR QUERY HERE" --top-k 5 --json
 ```
 
 Parse the JSON output: each result has `file`, `score`, `section`, `type`, `status`.
@@ -46,15 +64,18 @@ Parse the JSON output: each result has `file`, `score`, `section`, `type`, `stat
   scan the relevant directory in step 1.
 - If no results or `score < 0.30` → fall back to step 1 (manual scan).
 - If search fails with exit code 2 (index not built) → fall back to step 1 and
-  remind the user to build the index (`skills/query/.venv/bin/python skills/query/scripts/index.py full`).
+  remind the user to build the index:
+  ```bash
+  brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/index.py full
+  ```
 
 Filter flags when useful:
 ```bash
 # Only evergreen/refined notes
-skills/query/.venv/bin/python skills/query/scripts/search.py "query" --status evergreen
+brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/search.py "query" --status evergreen
 
 # Only a specific note type
-skills/query/.venv/bin/python skills/query/scripts/search.py "query" --type topic
+brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/search.py "query" --type topic
 ```
 
 **1. Manual scan (fallback or complement)**
@@ -99,10 +120,10 @@ a stub. Gaps are as useful as answers.
 
 ---
 **Notes referenced**
-- [[note-slug]] — one-line description of what it contributed
+- note-slug — one-line description of what it contributed
 
 **Worth exploring**
-- [[related-note]] — why it's relevant
+- related-note — why it's relevant
 
 **Gaps**
 - [topic or question the KB doesn't cover yet]
@@ -125,7 +146,7 @@ A complex synthesis might need more paragraphs.
 
 If a scan turns up no relevant notes, say so clearly:
 
-> "I don't see anything in your KB on this yet. Your closest notes are [[X]] and [[Y]],
+> "I don't see anything in your KB on this yet. Your closest notes are X and Y,
 > which touch on [related concept]. Want me to create a stub note to capture what you
 > know now?"
 
@@ -136,7 +157,7 @@ Offering to create a stub is useful — it turns a miss into a capture moment.
 The semantic search depends on a vector index being built and kept current.
 This is handled automatically via:
 
-1. **Claude Code hook** — fires after every Write/Edit on `data/`, keeps index current
+1. **Git hook** — fires after every Write/Edit on `data/`, keeps index current
    in real time as notes are created or modified.
 2. **Cron job** — runs every 15 minutes to catch edits from external editors
    (Obsidian, VS Code, etc.)
@@ -144,8 +165,8 @@ This is handled automatically via:
 If the index is missing or stale, fall back to step 1 and remind the user:
 ```bash
 # First-time setup or full rebuild
-skills/query/.venv/bin/python skills/query/scripts/index.py full
+brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/index.py full
 
 # Check index status
-skills/query/.venv/bin/python skills/query/scripts/index.py status
+brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/index.py status
 ```

@@ -1,21 +1,6 @@
 import type { App, SayFn } from '@slack/bolt';
-import { BaseMessage, HumanMessage, AIMessage } from '@langchain/core/messages';
-import { runAgent } from '../agent/index.js';
-
-// Thread-scoped conversation history: thread_ts → messages
-const history = new Map<string, BaseMessage[]>();
-const MAX_HISTORY = 20;
-
-function getHistory(threadTs: string): BaseMessage[] {
-  return history.get(threadTs) ?? [];
-}
-
-function updateHistory(threadTs: string, human: string, ai: string): void {
-  const h = getHistory(threadTs);
-  h.push(new HumanMessage(human), new AIMessage(ai));
-  if (h.length > MAX_HISTORY) h.splice(0, h.length - MAX_HISTORY);
-  history.set(threadTs, h);
-}
+import { runAgent, isThreadActive } from '../agent/index.js';
+import { slackify, chunkSlackText, postSlackChunk, SLACK_CHUNK_MAX } from './formatter.js';
 
 interface HandleCtx {
   text: string;
@@ -29,20 +14,23 @@ async function handle({ text, threadTs, channelId, say, client }: HandleCtx): Pr
   const trimmed = text.trim();
   if (!trimmed) return;
 
-  // Send placeholder while working
   const placeholderRes = await say({ text: '_thinking..._', thread_ts: threadTs });
   const placeholderTs = placeholderRes.ts as string;
 
   try {
-    const reply = await runAgent(trimmed, getHistory(threadTs));
-    updateHistory(threadTs, trimmed, reply);
+    const reply = await runAgent(trimmed, threadTs);
+    const formatted = slackify(reply?.trim() || 'No result.');
+    const chunks = chunkSlackText(formatted, SLACK_CHUNK_MAX);
 
-    const safeReply = reply?.trim() || 'No result.';
-    await client.chat.update({
-      channel: channelId,
-      ts: placeholderTs,
-      text: safeReply,
-    });
+    console.log(`[slack] raw=${reply?.length ?? 0} formatted=${formatted.length} chunks=${chunks.length}`);
+
+    // First chunk replaces the placeholder
+    await postSlackChunk(client, channelId, chunks[0], { ts: placeholderTs });
+
+    // Remaining chunks go into the thread
+    for (let i = 1; i < chunks.length; i++) {
+      await postSlackChunk(client, channelId, chunks[i], { threadTs });
+    }
   } catch (err: any) {
     const msg = `Error: ${err.message ?? 'Unknown error'}`;
     await client.chat.update({ channel: channelId, ts: placeholderTs, text: msg });
@@ -50,15 +38,13 @@ async function handle({ text, threadTs, channelId, say, client }: HandleCtx): Pr
 }
 
 export function registerHandlers(app: App): void {
-  // Direct messages + follow-up replies in active threads (no mention needed)
   app.message(async ({ message, say, client }) => {
     const msg = message as any;
-    if (msg.subtype) return; // skip edits, bot messages
+    if (msg.subtype) return;
 
     const isDM = msg.channel_type === 'im';
     const threadTs = msg.thread_ts ?? msg.ts;
-    // In a channel thread: respond if the bot has already replied in this thread
-    const isActiveThread = msg.thread_ts != null && history.has(msg.thread_ts);
+    const isActiveThread = msg.thread_ts != null && isThreadActive(msg.thread_ts);
 
     if (!isDM && !isActiveThread) return;
 
@@ -71,9 +57,7 @@ export function registerHandlers(app: App): void {
     });
   });
 
-  // @tichat mentions in channels — starts a new thread conversation
   app.event('app_mention', async ({ event, say, client }) => {
-    // Strip the @mention from the text
     const text = (event.text ?? '').replace(/<@[A-Z0-9]+>/g, '').trim();
 
     await handle({
