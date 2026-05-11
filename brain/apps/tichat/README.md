@@ -26,7 +26,7 @@ You (Slack DM or @tichat mention)
 
 - Node.js 20+
 - [Pi](https://github.com/mariozechner/pi-coding-agent) installed globally (`npm i -g @mariozechner/pi-coding-agent`)
-- The Knowledge OS repo checked out locally (`brain/skills/query/.venv` must exist — the query skill's Python environment)
+- The Knowledge OS repo checked out locally (`brain/scripts/kb-search/.venv` must exist — the query skill's Python environment)
 - A Slack workspace where you can create apps
 
 ---
@@ -272,5 +272,5 @@ brain/apps/tichat/
 **Search returns no results**
 - The KB index may not be built. Run it manually:
   ```bash
-  brain/skills/query/.venv/bin/python brain/skills/query/scripts/index.py full
+  brain/scripts/kb-search/.venv/bin/python brain/scripts/kb-search/index.py full
   ```

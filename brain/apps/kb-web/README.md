@@ -72,7 +72,7 @@ The editor respects your existing KB conventions:
 
 ## Future (Pi Agent integration)
 
-The architecture预留 slots for Pi Agent SDK integration:
+The architecture has reserved slots for Pi Agent SDK integration:
 - `app/api/agent/` — SSE streaming agent sessions
 - Chat panel alongside editor (like Cursor/Claude Code sidebar)
 - Shared session storage with `tichat` Slack bot

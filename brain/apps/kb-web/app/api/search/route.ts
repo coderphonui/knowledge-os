@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { spawn } from "child_process";
 import path from "path";
 
-const KB_ROOT = process.env.KB_ROOT || path.resolve(process.cwd(), "../../data");
+const KB_ROOT = process.env.KB_ROOT || path.resolve(process.cwd(), "../../../data");
 const SEARCH_SCRIPT = path.resolve(KB_ROOT, "../brain/scripts/kb-search/search.py");
 
 export async function POST(request: Request) {

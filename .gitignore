@@ -14,12 +14,6 @@ Desktop.ini
 *.swo
 *~
 
-# ── Obsidian ──────────────────────────────────────────────────────────────────
-# Track plugin list and appearance, ignore per-machine workspace state
-.obsidian/workspace.json
-.obsidian/workspace-mobile.json
-.obsidian/cache
-.obsidian/plugins/*/data.json
 
 # ── Symlinks created by setup.sh ─────────────────────────────────────────────
 # setup.sh symlinks agents/CLAUDE.md → CLAUDE.md and into .github/ and .claude/
@@ -70,3 +64,4 @@ npm-debug.log*
 configuration
 workspace
 config.env
+.pi/sessions
